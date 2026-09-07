@@ -191,21 +191,34 @@ function formulaExpression(value) {
 }
 
 function cellValue(cell) {
-  if (!cell || cell.v === undefined) return '';
+  if (!cell || cell.v === undefined || cell.v === null) return '';
   const v = cell.v;
-  if (typeof v === 'string' || typeof v === 'number') return v;
+  if (typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean') return v;
   if (typeof v === 'object') {
     if (v.class === 'formula') {
       if (v.value !== undefined && v.value !== null) return v.value;
       const formula = formulaExpression(v);
       return formula ? `=${formula}` : '';
     }
+    if (v.class === 'checkbox') return Boolean(v.value);
     if (v.class === 'select') return (v.value || []).join(', ');
+    if ((v.class === 'image' || v.class === 'file') && (v.name || v.src)) {
+      return v.name || v.src;
+    }
     if (v.text) return v.text;
     if (v.url) return v.url;
     return JSON.stringify(v);
   }
   return String(v);
+}
+
+function cellHyperlink(cell) {
+  const value = cell?.v;
+  if (!value || typeof value !== 'object') return '';
+  if ((value.class === 'image' || value.class === 'file') && typeof value.src === 'string') {
+    return value.src;
+  }
+  return typeof value.url === 'string' ? value.url : '';
 }
 
 function parseStyle(s) {
@@ -233,6 +246,11 @@ function xlsxCellType(value) {
   return 's';
 }
 
+function gridBorder() {
+  const edge = () => ({ style: 'thin', color: { rgb: 'D9E1F2' } });
+  return { top: edge(), right: edge(), bottom: edge(), left: edge() };
+}
+
 // ── XLSX ──
 
 function toXlsx(sheets) {
@@ -257,9 +275,12 @@ function toXlsx(sheets) {
           wc.v = cell.v.value;
         }
 
+        const hyperlink = cellHyperlink(cell);
+        if (hyperlink) wc.l = { Target: hyperlink };
+
+        const st = { border: gridBorder() };
         if (hasSt) {
           const p = parseStyle(styles[cell.s]);
-          const st = {};
           const font = {};
           if (p.sz) font.sz = p.sz;
           if (p.bold) font.bold = true;
@@ -267,8 +288,11 @@ function toXlsx(sheets) {
           if (Object.keys(font).length) st.font = font;
           if (p.ha !== undefined) st.alignment = { horizontal: ['left', 'center', 'right'][p.ha] || 'left', vertical: 'center' };
           if (p.bi !== undefined && bgColors[p.bi]) { const h = rgbHex(bgColors[p.bi]); if (h) st.fill = { fgColor: { rgb: h }, patternType: 'solid' }; }
-          if (Object.keys(st).length) wc.s = st;
         }
+        if (typeof wc.v === 'string' && /[\r\n]/.test(wc.v)) {
+          st.alignment = { ...(st.alignment || {}), wrapText: true };
+        }
+        wc.s = st;
 
         ws[ref] = wc;
       }
@@ -284,7 +308,17 @@ function toXlsx(sheets) {
         merges.push({ s: { r: mc.row, c: mc.col }, e: { r: Math.min(mc.row + mc.rowCount - 1, sheet.rows - 1), c: Math.min(mc.col + mc.colCount - 1, sheet.cols - 1) } });
       }
     }
-    if (merges.length) ws['!merges'] = merges;
+    if (merges.length) {
+      for (const merge of merges) {
+        for (let r = merge.s.r; r <= merge.e.r; r++) {
+          for (let c = merge.s.c; c <= merge.e.c; c++) {
+            const ref = XLSX.utils.encode_cell({ r, c });
+            if (!ws[ref]) ws[ref] = { t: 's', v: '', s: { border: gridBorder() } };
+          }
+        }
+      }
+      ws['!merges'] = merges;
+    }
 
     XLSX.utils.book_append_sheet(wb, ws, sheet.name);
   }

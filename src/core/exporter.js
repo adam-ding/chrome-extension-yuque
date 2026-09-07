@@ -8,6 +8,7 @@ import { saveBlobToDisk, saveContentToDisk, downloadUrlToDisk } from './download
 import { delay, sanitizePathComponent, sanitizePathSegments, guessImageExt } from './utils.js';
 import { refreshAbortController, abortActiveTasks } from './task-controller.js';
 import { EXPORT_FORMATS, DEFAULT_SETTINGS, DOC_TYPES, DOC_TYPE_EXPORT_OPTIONS, SMART_EXPORT_KEY, BOOKMARKS_VIRTUAL_BOOK_ID, BOOKMARKS_VIRTUAL_BOOK_NAME, BOOKMARKS_LOOSE_DOCS_FOLDER, SUPPORTED_DOC_TYPES } from './constants.js';
+import { applyFileSelection, getSelectedFiles } from './file-selection.js';
 
 let activeRunToken = null;
 let alarmListenerRegistered = false;
@@ -83,6 +84,9 @@ async function dispatchRuntimeMessage(message, sender, sendResponse) {
         return;
       case 'getFileInfo':
         await handleGetFileInfo(message.data, sendResponse);
+        return;
+      case 'setFileSelection':
+        await handleSetFileSelection(message.data, sendResponse);
         return;
       case 'startExport':
         await handleStartExport(message.data, sendResponse);
@@ -320,7 +324,7 @@ async function handleGetFileInfo(data, sendResponse) {
       exportState.encryptedItems = bookmarkFiles.encryptedItems;
 
       const encryptedCount = exportState.encryptedItems.length;
-      if (encryptedCount > 0) sendLog(`发现 ${encryptedCount} 个加密项，将在未加密内容下载完成后处理。`);
+      if (encryptedCount > 0) sendLog(`发现 ${encryptedCount} 个加密项，验证后将加入文档选择。`);
     }
 
     // Process org bookmarks
@@ -334,6 +338,14 @@ async function handleGetFileInfo(data, sendResponse) {
       totalFolders += bookmarkFiles.folderCount;
       if (bookmarkFiles.encryptedItems.length) {
         exportState.encryptedItems.push(...bookmarkFiles.encryptedItems);
+      }
+    }
+
+    if (exportState.encryptedItems.length > 0) {
+      const settings = await chrome.storage.local.get(['skipEncryptedBookmarks']);
+      if (settings.skipEncryptedBookmarks) {
+        sendLog(`已跳过 ${exportState.encryptedItems.length} 个加密项（设置中已开启"跳过加密内容"）。`);
+        exportState.encryptedItems = [];
       }
     }
 
@@ -356,7 +368,7 @@ async function handleGetFileInfo(data, sendResponse) {
       throw new Error('所选知识库中未获取到任何文档。');
     }
 
-    exportState.fileList = allFiles.map(file => ({ ...file, status: 'pending', localPath: '' }));
+    exportState.fileList = allFiles.map(file => ({ ...file, status: 'pending', localPath: '', selected: true }));
     exportState.totalFiles = allFiles.length;
     exportState.folderCount = totalFolders;
     exportState.currentFileIndex = 0;
@@ -364,6 +376,12 @@ async function handleGetFileInfo(data, sendResponse) {
     await saveStateSafely();
     sendLog(`成功获取 ${allFiles.length} 个文档，${totalFolders} 个文件夹。`);
     sendResponse({ success: true, data: exportState });
+    if (exportState.encryptedItems.length > 0) {
+      chrome.runtime.sendMessage({
+        action: 'showPasswordDialog',
+        data: { encryptedItems: exportState.encryptedItems }
+      }).catch(() => {});
+    }
   } catch (error) {
     const message = error.message.includes('登录')
       ? '未检测到登录态，请确认已在 https://www.yuque.com 登录后重试。'
@@ -371,6 +389,18 @@ async function handleGetFileInfo(data, sendResponse) {
     sendLog(`获取文件信息失败: ${message}`);
     sendResponse({ success: false, error: message });
   }
+}
+
+async function handleSetFileSelection(data, sendResponse) {
+  if (exportState.isExporting || isRunnerActive()) {
+    sendResponse({ success: false, error: '导出进行中无法修改文档选择。' });
+    return;
+  }
+
+  exportState.fileList = applyFileSelection(exportState.fileList, data?.selectedFileIndexes);
+  await saveStateSafely();
+  const selectedCount = exportState.fileList.filter(file => file.selected).length;
+  sendResponse({ success: true, selectedCount });
 }
 
 async function handleStartExport(data, sendResponse) {
@@ -388,6 +418,11 @@ async function handleStartExport(data, sendResponse) {
       return;
     }
 
+    const selectedFiles = getSelectedFiles(exportState.fileList, data?.selectedFileIndexes);
+    if (!selectedFiles.length) {
+      sendResponse({ success: false, error: '请至少选择一篇文档。' });
+      return;
+    }
     const authInfo = await checkAuth();
     if (!authInfo.isLoggedIn) throw new Error('登录态已过期');
 
@@ -398,6 +433,8 @@ async function handleStartExport(data, sendResponse) {
       'markdownMode', 'sheetMode'
     ]);
 
+    exportState.fileList = selectedFiles;
+    exportState.totalFiles = selectedFiles.length;
     exportState.isExporting = true;
     exportState.isPaused = false;
     exportState.currentFileIndex = 0;
@@ -1344,6 +1381,7 @@ async function handleVerifyPassword(data, sendResponse) {
         f.bookName = `${BOOKMARKS_VIRTUAL_BOOK_NAME}/${sanitizePathComponent(data.bookName || '已解密知识库')}`;
         f.bookNamespace = '';
         f.status = 'pending';
+        f.selected = true;
       });
 
       // Add to fileList and update state
@@ -1390,6 +1428,7 @@ async function handleVerifyPassword(data, sendResponse) {
         bookNamespace: '',
         updatedAt: data.updatedAt,
         isBookmark: data.isBookmark !== false,
+        selected: true,
       });
       exportState.totalFiles = exportState.fileList.length;
       await saveStateSafely();

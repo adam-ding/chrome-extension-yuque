@@ -3,6 +3,7 @@ import { uiState, updateUiState } from './state.js';
 import { START_BUTTON_DEFAULT_TEXT } from './constants.js';
 import { i18n } from './i18n.js';
 import { BOOKMARKS_VIRTUAL_BOOK_ID, BOOKMARKS_VIRTUAL_BOOK_NAME } from '../core/constants.js';
+import { syncDocumentSelection } from './document-selection.js';
 
 const STATUS_ICONS = { success: '🎉', error: '⚠️', info: 'ℹ️' };
 let statusHideTimer = null;
@@ -443,6 +444,7 @@ export function syncUiWithState(state) {
   } else {
     if (totalFilesSpan) totalFilesSpan.textContent = '0';
     if (folderCountSpan) folderCountSpan.textContent = '0';
+    if (fileInfoDiv) fileInfoDiv.style.display = 'none';
   }
 
   if (getInfoBtn) getInfoBtn.disabled = uiState.isExporting || selectedBookIdSet.size === 0;
@@ -468,6 +470,8 @@ export function syncUiWithState(state) {
   if (logContainer && state.logs && state.logs.length > 0) {
     renderLogs(mergeLogs(state.logs));
   }
+
+  syncDocumentSelection(nextFileInfo?.fileList || [], uiState.isExporting);
 }
 
 export function resetUiToIdle() {

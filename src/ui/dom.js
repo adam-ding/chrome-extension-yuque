@@ -44,6 +44,17 @@ export const domRefs = {
   selectedCountSpan: null,
   selectedDocsSpan: null,
   selectionBar: null,
+  // Document selection
+  fileSelectGroup: null,
+  fileSelectTrigger: null,
+  fileSelectLabel: null,
+  fileSelectModal: null,
+  fileSelectModalClose: null,
+  fileSelectSearch: null,
+  fileSelectAll: null,
+  fileSelectSummary: null,
+  fileSelectList: null,
+  fileSelectDone: null,
   // Rating modal
   ratingModal: null,
   ratingModalClose: null,
@@ -99,6 +110,17 @@ export function cacheDomElements() {
   domRefs.selectedCountSpan = document.getElementById('selectedCount');
   domRefs.selectedDocsSpan = document.getElementById('selectedDocs');
   domRefs.selectionBar = document.getElementById('selectionBar');
+  // Document selection
+  domRefs.fileSelectGroup = document.getElementById('fileSelectGroup');
+  domRefs.fileSelectTrigger = document.getElementById('fileSelectTrigger');
+  domRefs.fileSelectLabel = document.getElementById('fileSelectLabel');
+  domRefs.fileSelectModal = document.getElementById('fileSelectModal');
+  domRefs.fileSelectModalClose = document.getElementById('fileSelectModalClose');
+  domRefs.fileSelectSearch = document.getElementById('fileSelectSearch');
+  domRefs.fileSelectAll = document.getElementById('fileSelectAll');
+  domRefs.fileSelectSummary = document.getElementById('fileSelectSummary');
+  domRefs.fileSelectList = document.getElementById('fileSelectList');
+  domRefs.fileSelectDone = document.getElementById('fileSelectDone');
   // Rating modal
   domRefs.ratingModal = document.getElementById('ratingModal');
   domRefs.ratingModalClose = document.getElementById('ratingModalClose');

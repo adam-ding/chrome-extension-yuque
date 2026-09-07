@@ -7,6 +7,7 @@ import {
 } from './ui.js';
 import { START_BUTTON_DEFAULT_TEXT } from './constants.js';
 import { i18n } from './i18n.js';
+import { getSelectedDocumentIndexes } from './document-selection.js';
 
 export async function handleCheckAuth(skipFetchBooks = false) {
   try {
@@ -104,6 +105,12 @@ export async function handleStart() {
     return;
   }
 
+  const selectedFileIndexes = getSelectedDocumentIndexes();
+  if (!selectedFileIndexes.length) {
+    showStatus(i18n('pleaseSelectDocuments'), 'error');
+    return;
+  }
+
   // Get export type from storage (set by popup's export type dropdown)
   const stored = await chrome.storage.local.get(['exportType']);
   const exportType = stored.exportType || 'smart';
@@ -114,7 +121,7 @@ export async function handleStart() {
   try {
     const response = await chrome.runtime.sendMessage({
       action: 'startExport',
-      data: { exportType }
+      data: { exportType, selectedFileIndexes }
     });
     if (!response?.success) throw new Error(response?.error || i18n('unknownError'));
     const uiStateResponse = await chrome.runtime.sendMessage({ action: 'getUiState' });

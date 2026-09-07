@@ -1,8 +1,10 @@
 import { addLog, showStatus, syncUiWithState } from './ui.js';
+import { i18n } from './i18n.js';
 
 let encryptedQueue = [];
 let currentItem = null;
 let lastFocusedElement = null;
+let unlockedFileCount = 0;
 
 /**
  * Show password modal for a list of encrypted items.
@@ -10,6 +12,7 @@ let lastFocusedElement = null;
  */
 export function showPasswordModal(items) {
   encryptedQueue = [...items];
+  unlockedFileCount = 0;
   showNextItem();
 }
 
@@ -19,8 +22,8 @@ function showNextItem() {
 
   if (encryptedQueue.length === 0) {
     hidePasswordModal();
-    // Trigger export of newly added files
-    startExportNewFiles();
+    refreshDocumentSelection(unlockedFileCount > 0);
+    unlockedFileCount = 0;
     return;
   }
 
@@ -107,6 +110,7 @@ async function handleSubmit() {
 
     if (response?.success) {
       addLog(`验证成功: ${currentItem.title}，新增 ${response.newFiles} 篇文档`);
+      unlockedFileCount += Number(response.newFiles) || 0;
       encryptedQueue.shift();
       showNextItem();
     } else {
@@ -143,8 +147,8 @@ function handleCloseAll() {
   encryptedQueue = [];
   currentItem = null;
   hidePasswordModal();
-  // Start export if there are new pending files
-  startExportNewFiles();
+  refreshDocumentSelection(false);
+  unlockedFileCount = 0;
 }
 
 function hidePasswordModal() {
@@ -181,30 +185,14 @@ function resolveFallbackFocusTarget() {
   return document.body instanceof HTMLElement ? document.body : null;
 }
 
-/**
- * After password verification adds new files, trigger export for them.
- */
-async function startExportNewFiles() {
+async function refreshDocumentSelection(showUnlockedNotice) {
   try {
     const stateResp = await chrome.runtime.sendMessage({ action: 'getUiState' });
     if (!stateResp?.success) return;
-
-    const pendingCount = stateResp.data.fileList?.filter(f => f.status === 'pending').length || 0;
-    if (pendingCount > 0) {
-      addLog(`开始导出新解锁的 ${pendingCount} 篇文档...`);
-      // Get export type from storage
-      const stored = await chrome.storage.local.get(['exportType']);
-      const exportType = stored.exportType || 'smart';
-
-      await chrome.runtime.sendMessage({
-        action: 'startExport',
-        data: { exportType }
-      });
-
-      const refreshedState = await chrome.runtime.sendMessage({ action: 'getUiState' });
-      if (refreshedState?.success) {
-        syncUiWithState(refreshedState.data);
-      }
+    syncUiWithState(stateResp.data);
+    if (showUnlockedNotice) {
+      addLog(i18n('documentsUnlocked'));
+      showStatus(i18n('documentsUnlocked'), 'success');
     }
   } catch {}
 }
