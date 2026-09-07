@@ -94,6 +94,15 @@
       <span id="folderCount" class="file-stat-value">0</span>
     </div>
 
+    <!-- Document selector (available after file info is loaded) -->
+    <div class="form-group" id="fileSelectGroup" style="display:none;">
+      <label><span data-i18n="selectDocumentsLabel">选择文档:</span></label>
+      <button type="button" id="fileSelectTrigger" class="book-dropdown-trigger" aria-haspopup="dialog" aria-expanded="false">
+        <span id="fileSelectLabel" class="book-dropdown-label">已选 0 / 0 篇</span>
+        <span class="book-dropdown-arrow"></span>
+      </button>
+    </div>
+
     <!-- Action buttons -->
     <div class="form-group">
       <button id="getInfo" type="button" class="btn btn-primary">
@@ -135,6 +144,24 @@
         <p class="log-tip">✨ <span data-i18n="welcomeTip2">选择知识库后点击🔍获取信息</span></p>
         <p class="log-tip">✨ <span data-i18n="welcomeTip3">然后点击🚀按钮开始导出</span></p>
       </div>
+    </div>
+  </div>
+
+  <!-- Document Selection Modal -->
+  <div id="fileSelectModal" class="file-select-modal" inert>
+    <div class="file-select-modal-card" role="dialog" aria-modal="true" aria-labelledby="fileSelectTitle">
+      <button id="fileSelectModalClose" class="sponsor-modal-close" data-i18n-aria-label="closeDocumentSelection" aria-label="关闭">&times;</button>
+      <div class="file-select-modal-header">
+        <h3 id="fileSelectTitle" data-i18n="documentSelectionTitle">选择导出文档</h3>
+        <p id="fileSelectSummary">已选 0 / 0 篇</p>
+      </div>
+      <input id="fileSelectSearch" type="search" class="file-selection-search" data-i18n-placeholder="searchDocumentsPlaceholder" placeholder="搜索文档、知识库或目录">
+      <label class="file-selection-all">
+        <input id="fileSelectAll" type="checkbox">
+        <span data-i18n="selectAllDocuments">全选文档</span>
+      </label>
+      <div id="fileSelectList" class="file-selection-list"></div>
+      <button id="fileSelectDone" type="button" class="btn btn-primary file-selection-done" data-i18n="finishDocumentSelection">完成选择</button>
     </div>
   </div>
 

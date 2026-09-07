@@ -12,12 +12,14 @@ import { initSponsorInteractions } from './ui/sponsor.js';
 import { initRatingModal } from './ui/rating.js';
 import { initRuntimeMessaging } from './ui/messaging.js';
 import { applyI18n } from './ui/i18n.js';
+import { initDocumentSelection } from './ui/document-selection.js';
 
 let selectedExportType = 'smart';
 
 document.addEventListener('DOMContentLoaded', async () => {
   applyI18n();
   cacheDomElements();
+  initDocumentSelection();
   setStartButtonLabel(START_BUTTON_DEFAULT_TEXT());
 
   const hasRestoredBooks = await restorePersistedState();
